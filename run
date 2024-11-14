@@ -1,0 +1,550 @@
+ // 只需配置自己的strava然后将该代码复制导入 scriptable  即可
+
+async function createWidget() {
+  const widget = new ListWidget();
+  
+  // 根据系统外观模式设置背景颜色
+  if (Device.isUsingDarkAppearance()) {
+    widget.backgroundColor = new Color("#1D1D1F");  // 深色模式
+  } else {
+    widget.backgroundColor = new Color("#FFFFFF");  // 浅色模式
+  }
+  
+  widget.setPadding(8, 40, 8, 30);
+  
+  const mainStack = widget.addStack();
+  mainStack.layoutHorizontally();
+  
+  // 左侧运动数据
+  const runStack = mainStack.addStack();
+  runStack.layoutVertically();
+  runStack.size = new Size(190, 0);
+  
+  // 添加顶部间距，将内容向下移动
+  runStack.addSpacer(10);  // 添加10点的顶部间距
+  
+  // 运动标题行
+  const runTitleStack = runStack.addStack();
+  runTitleStack.layoutHorizontally();
+  runTitleStack.centerAlignContent();
+  
+  const runIcon = runTitleStack.addText("🏃‍♂️ ");
+  runIcon.font = Font.systemFont(16);
+  
+  const activityData = await getRunningData();
+  const runTitle = runTitleStack.addText(activityData.type);
+  runTitle.textColor = new Color("#64B5F6");
+  runTitle.font = Font.boldSystemFont(16);
+  runTitle.lineLimit = 1;
+  
+  runStack.addSpacer(8);
+  
+  // 数据显示行，使用水平布局
+  const dateStack = runStack.addStack();
+  dateStack.layoutHorizontally();
+  const dateLabel = dateStack.addText("Date:  ");
+  dateLabel.textColor = new Color("#999999");
+  dateLabel.lineLimit = 1;
+  const dateValue = dateStack.addText(activityData.date);
+  dateValue.textColor = new Color("#FFFFFF");
+  dateValue.lineLimit = 1;
+  
+  runStack.addSpacer(4);
+  
+  const distanceStack = runStack.addStack();
+  distanceStack.layoutHorizontally();
+  const disLabel = distanceStack.addText("Dis:  ");
+  disLabel.textColor = new Color("#999999");
+  disLabel.lineLimit = 1;
+  const disValue = distanceStack.addText(activityData.distance);
+  disValue.textColor = new Color("#FFFFFF");
+  disValue.lineLimit = 1;
+  
+  runStack.addSpacer(4);
+  
+  const paceStack = runStack.addStack();
+  paceStack.layoutHorizontally();
+  const paceLabel = paceStack.addText("Pace:  ");
+  paceLabel.textColor = new Color("#999999");
+  paceLabel.lineLimit = 1;
+  const paceValue = paceStack.addText(activityData.pace);
+  paceValue.textColor = new Color("#FFFFFF");
+  paceValue.lineLimit = 1;
+  
+  // 添加间距
+  runStack.addSpacer(8);
+  
+  // 添加第一行名言，确保完整显示
+  const quoteStack1 = runStack.addStack();
+  quoteStack1.layoutHorizontally();
+  const quote1 = quoteStack1.addText("Why do u want to climb Mount?");
+  quote1.textColor = new Color("#F44336");  // 改为红色
+  quote1.font = Font.systemFont(10);
+  quote1.lineLimit = 1;
+  
+  // 添加小间距
+  runStack.addSpacer(2);
+  
+  // 添加第二行名言
+  const quoteStack2 = runStack.addStack();
+  quoteStack2.layoutHorizontally();
+  const quote2 = quoteStack2.addText("Because it's there.⛰️");
+  quote2.textColor = new Color("#64B5F6");  // 使用蓝色突出显示回答
+  quote2.font = Font.italicSystemFont(10);  // 使用斜体
+  quote2.lineLimit = 1;
+  
+  // 增加弹性间距，将地图推到最右边
+  mainStack.addSpacer();
+  
+  // 右侧地图部分
+  try {
+    const mapStack = mainStack.addStack();
+    mapStack.layoutVertically();
+    mapStack.size = new Size(140, 150);
+    
+    // 根据系统外观模式设置地图背景和阴影
+    if (Device.isUsingDarkAppearance()) {
+      mapStack.backgroundColor = new Color("#1D1D1F", 0.3);  // 深色模式半透明背景
+    } else {
+      mapStack.backgroundColor = new Color("#000000", 0.05);  // 浅色模式淡灰色背景
+    }
+    
+    mapStack.cornerRadius = 10;  // 圆角
+    
+    // 添加阴影效果
+    mapStack.shadowColor = Color.dynamic(
+      new Color("#000000", 0.3),  // 浅色模式阴影
+      new Color("#000000", 0.5)   // 深色模式阴影
+    );
+    mapStack.shadowRadius = 3;
+    mapStack.shadowOffset = new Point(0, 2);
+    
+    const activities = await getStravaActivities();
+    let activityDetails = null;
+    
+    if (activities?.[0]) {
+      activityDetails = await getActivityDetails(activities[0].id);
+      
+      // 添加详细的调试日志
+      console.log("[Debug] 活动详情:", {
+        id: activityDetails?.id,
+        name: activityDetails?.name,
+        location_city: activityDetails?.location_city,
+        location_state: activityDetails?.location_state,
+        start_address: activityDetails?.start_address,
+        formatted_location: activityDetails?.formatted_location
+      });
+      
+      if (activityDetails) {
+        const mapImage = await getMapImage(activityDetails);
+        if (mapImage) {
+          const mapElement = mapStack.addImage(mapImage);
+          mapElement.imageSize = new Size(140, 140);
+          
+          // 添加地址信息
+          mapStack.addSpacer(2);
+          const cityStack = mapStack.addStack();
+          cityStack.layoutHorizontally();
+          cityStack.centerAlignContent();
+          
+          cityStack.addSpacer();
+          
+          // 打印最终使用的地址信息
+          console.log("[Debug] 最终显示的地址:", activityDetails.formatted_location || "Unknown");
+          
+          const locationText = cityStack.addText(activityDetails.formatted_location || "Unknown");
+          locationText.textColor = new Color("#999999");
+          locationText.font = Font.systemFont(10);
+          locationText.centerAlignText();
+          
+          cityStack.addSpacer();
+        } else {
+          const noRoute = mapStack.addText("No Route");
+          noRoute.textColor = new Color("#999999");
+          noRoute.font = Font.systemFont(12);
+        }
+      }
+    } else {
+      const noActivity = mapStack.addText("No Activity");
+      noActivity.textColor = new Color("#999999");
+      noActivity.font = Font.systemFont(12);
+    }
+  } catch (error) {
+    console.error("[Error] 地图处理失败:", error);
+    const errorText = mapStack.addText("Load Failed");
+    errorText.textColor = new Color("#FF0000");
+    errorText.font = Font.systemFont(12);
+  }
+  
+  // 根据系统外观模式调整文字颜色
+  const textColor = Device.isUsingDarkAppearance() ? 
+    new Color("#FFFFFF") :  // 深色模式下的文字颜色
+    new Color("#000000");   // 浅色模式下的文字颜色
+    
+  const subTextColor = Device.isUsingDarkAppearance() ? 
+    new Color("#999999") :  // 深色模式下的次要文字颜色
+    new Color("#666666");   // 浅色模式下的次要文字颜色
+  
+  // 更新文字颜色
+  dateLabel.textColor = subTextColor;
+  dateValue.textColor = textColor;
+  disLabel.textColor = subTextColor;
+  disValue.textColor = textColor;
+  paceLabel.textColor = subTextColor;
+  paceValue.textColor = textColor;
+  
+  // 名言的颜色保持不变，因为它们有特定的颜色主题
+  
+  return widget;
+}
+
+async function getRunningData() {
+  try {
+    console.log("[Debug] 开始获取运动数据");
+    const activities = await getStravaActivities();
+    
+    if (!activities.length) {
+      console.log("[Debug] 没有找到任何活动");
+      return defaultData();
+    }
+    
+    const latestActivity = activities[0];
+    console.log("[Debug] 最新运动活动:", latestActivity ? {
+      id: latestActivity.id,
+      type: latestActivity.type,
+      name: latestActivity.name,
+      date: latestActivity.start_date,
+      distance: latestActivity.distance,
+      time: latestActivity.moving_time
+    } : "未找到");
+    
+    if (!latestActivity) {
+      console.log("[Debug] 没有找到运动活动");
+      return defaultData();
+    }
+    
+    // 处理数据
+    const date = new Date(latestActivity.start_date);
+    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    const distance = (latestActivity.distance / 1000).toFixed(2);
+    const paceSeconds = latestActivity.moving_time / (latestActivity.distance / 1000);
+    const paceMinutes = Math.floor(paceSeconds / 60);
+    const paceRemainingSeconds = Math.floor(paceSeconds % 60);
+    const pace = `${paceMinutes}'${paceRemainingSeconds.toString().padStart(2, '0')}"`;
+    
+    const result = {
+      type: activityTypeMap[latestActivity.type] || latestActivity.type,
+      date: formattedDate,
+      distance: `${distance} km`,
+      pace: pace
+    };
+    
+    console.log("[Debug] 处理后的数据:", result);
+    return result;
+    
+  } catch (error) {
+    console.error("[Error] 获取运动数据失败:", error.message);
+    return defaultData();
+  }
+}
+
+function defaultData() {
+  return {
+    type: "No Activity",
+    date: "No Record",
+    distance: "-- km",
+    pace: "--'--\""
+  };
+}
+
+// 添加运动类型映射
+const activityTypeMap = {
+  'Run': 'Running',
+  'Ride': 'Cycling',
+  'Swim': 'Swimming',
+  'Walk': 'Walking',
+  'Hike': 'Hiking',
+  'Workout': 'Workout',
+  'WeightTraining': 'Weight Training',
+  'Yoga': 'Yoga'
+};
+
+// 修改 Strava 配置
+const STRAVA_CONFIG = {
+  client_id: 106114,
+  client_secret: "b345271a3d96b4fbf9698fcc7c50da92f81356aa",
+  refresh_token: "b149d8168f0e3c9bc47b44b3a20f0a19a57bad05",
+  is_first_time: false
+};
+
+async function getStravaAccessToken() {
+  try {
+    const url = 'https://www.strava.com/oauth/token';
+    const req = new Request(url);
+    req.method = 'POST';
+    req.headers = {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    };
+    
+    const params = [
+      `client_id=${STRAVA_CONFIG.client_id}`,
+      `client_secret=${STRAVA_CONFIG.client_secret}`,
+      `refresh_token=${STRAVA_CONFIG.refresh_token}`,
+      'grant_type=refresh_token'
+    ].join('&');
+    
+    req.body = params;
+    
+    const response = await req.loadString();
+    const jsonResponse = JSON.parse(response);
+    
+    if (!jsonResponse.access_token) {
+      console.error("[Error] Token 响应:", response);
+      throw new Error('无效的 token 响应');
+    }
+    
+    return jsonResponse.access_token;
+  } catch (error) {
+    console.error("[Error] 获取 token 失败:", error);
+    throw error;
+  }
+}
+
+async function getStravaActivities() {
+  try {
+    const token = await getStravaAccessToken();
+    console.log("[Debug] 成功获取 token");
+    
+    const url = 'https://www.strava.com/api/v3/athlete/activities?per_page=10';
+    const req = new Request(url);
+    req.headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    const response = await req.loadString();
+    console.log("[Debug] API 响应:", response.substring(0, 200) + "...");
+    
+    const data = JSON.parse(response);
+    return data;
+  } catch (error) {
+    console.error("[Error] 获取活动失败:", error);
+    throw error;
+  }
+}
+
+async function getActivityDetails(activityId) {
+  try {
+    if (!activityId) {
+      console.log("[Debug] 没有活动ID");
+      return null;
+    }
+    
+    const token = await getStravaAccessToken();
+    const url = `https://www.strava.com/api/v3/activities/${activityId}`;
+    const req = new Request(url);
+    req.headers = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    const response = await req.loadString();
+    const data = JSON.parse(response);
+    
+    let locationInfo = '';
+    
+    // 使用起点坐标获取位置信息
+    if (data.start_latlng?.length === 2) {  // 简化条件判断
+      const [lat, lng] = data.start_latlng;
+      
+      try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=8&addressdetails=1`;
+        const geoReq = new Request(nominatimUrl);
+        geoReq.headers = {
+          'User-Agent': 'Scriptable Widget'
+        };
+        
+        const geoResponse = await geoReq.loadJSON();
+        
+        // 直接从地址中提取城市信息
+        locationInfo = geoResponse.address?.city || 
+                      geoResponse.address?.state_district || 
+                      geoResponse.address?.municipality || 
+                      data.location_city || 
+                      "Unknown Location";
+      } catch (error) {
+        locationInfo = data.location_city || "Unknown Location";
+      }
+    } else {
+      locationInfo = data.location_city || "Unknown Location";
+    }
+    
+    // 清理位置信息，只保留城市名
+    locationInfo = locationInfo
+      .replace(/(市|区|县|自治区|特别行政区|County|District|City|Province|Region)$/i, '')
+      .trim();
+    
+    return {
+      ...data,
+      formatted_location: locationInfo
+    };
+    
+  } catch (error) {
+    console.error("[Error] 获取活动详情失败:", error);
+    return null;
+  }
+}
+
+async function getMapImage(activity) {
+  try {
+    if (!activity?.map?.summary_polyline) {
+      console.log("[Debug] 没有找到路数据");
+      return null;
+    }
+    
+    const coordinates = decodePolyline(activity.map.summary_polyline);
+    console.log("[Debug] 解码后的坐标点数量:", coordinates.length);
+    
+    if (coordinates.length < 2) {
+      console.log("[Debug] 坐标点不足");
+      return null;
+    }
+    
+    // 计算边界
+    const bounds = coordinates.reduce((acc, point) => ({
+      minLat: Math.min(acc.minLat, point[0]),
+      maxLat: Math.max(acc.maxLat, point[0]),
+      minLng: Math.min(acc.minLng, point[1]),
+      maxLng: Math.max(acc.maxLng, point[1])
+    }), { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 });
+    
+    console.log("[Debug] 计算的边界:", bounds);
+    
+    // 创建绘图上下文
+    const size = 120;
+    const context = new DrawContext();
+    context.size = new Size(size, size);
+    context.opaque = false;
+    
+    // 设置绘图参数
+    const padding = 10;
+    const drawingWidth = size - (padding * 2);
+    const drawingHeight = size - (padding * 2);
+    
+    // 计算缩放比例
+    const latRange = bounds.maxLat - bounds.minLat;
+    const lngRange = bounds.maxLng - bounds.minLng;
+    const scale = Math.min(
+      drawingWidth / lngRange,
+      drawingHeight / latRange
+    );
+    
+    console.log("[Debug] 绘图参数:", {
+      size, padding, scale,
+      latRange, lngRange
+    });
+    
+    // 转换坐标点到画布坐标
+    const points = coordinates.map(coord => ({
+      x: padding + ((coord[1] - bounds.minLng) * scale),
+      y: padding + ((bounds.maxLat - coord[0]) * scale)
+    }));
+    
+    console.log("[Debug] 第一个点:", points[0]);
+    
+    // 绘制路线
+    const path = new Path();
+    points.forEach((point, index) => {
+      if (index === 0) {
+        path.move(new Point(point.x, point.y));
+      } else {
+        path.addLine(new Point(point.x, point.y));
+      }
+    });
+    
+    context.setStrokeColor(new Color("#64B5F6"));
+    context.setLineWidth(2);
+    context.addPath(path);
+    context.strokePath();
+    
+    // 绘制起点（绿色）
+    const startPath = new Path();
+    startPath.addEllipse(new Rect(
+      points[0].x - 3,
+      points[0].y - 3,
+      6,
+      6
+    ));
+    context.setFillColor(new Color("#4CAF50"));
+    context.addPath(startPath);
+    context.fillPath();
+    
+    // 绘制终点（红色）
+    const endPath = new Path();
+    const lastPoint = points[points.length - 1];
+    endPath.addEllipse(new Rect(
+      lastPoint.x - 3,
+      lastPoint.y - 3,
+      6,
+      6
+    ));
+    context.setFillColor(new Color("#F44336"));
+    context.addPath(endPath);
+    context.fillPath();
+    
+    console.log("[Debug] 绘制完成");
+    return context.getImage();
+    
+  } catch (error) {
+    console.error("[Error] 绘制失败:", error.message);
+    console.error("[Error] 错误堆栈:", error.stack);
+    return null;
+  }
+}
+
+// 解码 polyline 的函数
+function decodePolyline(str) {
+  const coordinates = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  
+  while (index < str.length) {
+    let result = 1;
+    let shift = 0;
+    let b;
+    do {
+      b = str.charCodeAt(index++) - 63;
+      result += (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lat += ((result & 1) ? ~(result >> 1) : (result >> 1));
+    
+    result = 1;
+    shift = 0;
+    do {
+      b = str.charCodeAt(index++) - 63;
+      result += (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lng += ((result & 1) ? ~(result >> 1) : (result >> 1));
+    
+    coordinates.push([lat * 1e-5, lng * 1e-5]);
+  }
+  
+  return coordinates;
+}
+
+if (config.runsInWidget) {
+  const widget = await createWidget();
+  
+  // 设置刷新间隔（1小时）
+  const refreshDate = new Date();
+  refreshDate.setHours(refreshDate.getHours() + 1);
+  widget.refreshAfterDate = refreshDate;
+  
+  Script.setWidget(widget);
+} else {
+  const widget = await createWidget();
+  await widget.presentMedium();
+}
+
+Script.complete(); 
